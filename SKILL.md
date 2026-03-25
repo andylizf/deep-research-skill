@@ -13,7 +13,7 @@ through a real browser and return the research report to the user.
 - **Date:** 2026-03-25
 - **ChatGPT version:** ChatGPT web (chatgpt.com), free + Plus tiers
 - **Browser:** Chrome 146.0.7680.164 (macOS, headed via playwright-cli)
-- **playwright-cli:** v1.59.0-alpha (patched fork at `~/.deep-research/playwright-cli/`)
+- **playwright-cli:** v1.59.0-alpha (locally installed + patched at `~/.deep-research/`)
 - **Key UI landmarks observed:**
   - Sidebar: "Deep research" link → `/deep-research`
   - Deep Research page placeholder: "Ask a complex question. Get a full report, with sources."
@@ -34,12 +34,13 @@ Deep Research moved to a different URL, export button relocated inside/outside i
 All skill files live under `~/.deep-research/`. Define this alias for all commands:
 
 ```bash
-PW="$HOME/.deep-research/playwright-cli/playwright-cli.js"
+PW="$HOME/.deep-research/pw"
 ```
 
 | Path | Purpose |
 |------|---------|
-| `~/.deep-research/playwright-cli/` | Patched fork of @playwright/cli (local, not global) |
+| `~/.deep-research/playwright-cli/` | Local @playwright/cli install (patched, not global) |
+| `~/.deep-research/pw` | Symlink to playwright-cli binary |
 | `~/.deep-research/Chrome.app/` | APFS clone of Chrome, re-signed for DYLD injection |
 | `~/.deep-research/window_suppress.dylib` | DYLD hook for zero-flash window suppression |
 | `~/.deep-research/cli.config.json` | Playwright launch config |
@@ -51,28 +52,21 @@ PW="$HOME/.deep-research/playwright-cli/playwright-cli.js"
 **Before doing anything else**, check if setup is complete:
 
 ```bash
-test -x "$HOME/.deep-research/playwright-cli/playwright-cli.js" \
+test -x "$HOME/.deep-research/pw" \
   && test -f "$HOME/.deep-research/window_suppress.dylib" \
   && test -d "$HOME/.deep-research/Chrome.app" \
   && echo "READY" || echo "SETUP_NEEDED"
 ```
 
-If SETUP_NEEDED, install everything with:
+If SETUP_NEEDED, run the setup script (from the skill repo):
 
 ```bash
-git clone -b feat/minimize-restore https://github.com/andylizf/playwright-cli.git ~/.deep-research/playwright-cli
-cd ~/.deep-research/playwright-cli && npm install
-bash macos/setup.sh
+bash ~/.tmp/deep-research-skill/setup.sh
 ```
 
-If already installed, re-run the setup script to refresh (e.g. after Chrome updates):
-
-```bash
-bash ~/.deep-research/playwright-cli/macos/setup.sh
-```
-
-The script is idempotent — safe to re-run. It auto-detects Chrome updates and
-recompiles native code when source files change.
+The script is idempotent — safe to re-run after Chrome updates or source changes.
+It installs `@playwright/cli` locally (no global pollution), applies patches, clones
+and re-signs Chrome, and compiles native code.
 
 ## Arguments
 
@@ -89,7 +83,7 @@ Parse these from the user's input before starting. Everything after options is t
 ## playwright-cli Quick Reference
 
 All commands use the named session `-s=deep`.
-Shorthand: `pw` = `$PW -s=deep` (where `PW="$HOME/.deep-research/playwright-cli/playwright-cli.js"`)
+Shorthand: `pw` = `$PW -s=deep` (where `PW="$HOME/.deep-research/pw"`)
 
 | Command | Purpose |
 |---------|---------|
@@ -109,7 +103,7 @@ Use these refs for subsequent click/fill/type commands. Always `snapshot` before
 
 **Important:** In actual commands, always use the full path:
 ```bash
-"$HOME/.deep-research/playwright-cli/playwright-cli.js" -s=deep <command>
+"$HOME/.deep-research/pw" -s=deep <command>
 ```
 `pw` is just shorthand for this document's readability. Only `open` needs the extra flags
 (`--headed`, `--profile`, `--config`).
@@ -181,7 +175,7 @@ After each `snapshot`, identify the current state from the accessibility tree:
 ### Phase 0: Launch & Check Session
 
 ```bash
-PW="$HOME/.deep-research/playwright-cli/playwright-cli.js"
+PW="$HOME/.deep-research/pw"
 
 # Launch browser — window starts hidden automatically (zero flash)
 "$PW" -s=deep --headed --profile ~/.deep-research/browser-profile --config ~/.deep-research/cli.config.json open
@@ -389,7 +383,7 @@ The report is inside an **iframe**. ChatGPT provides built-in export buttons.
 - **Keep window hidden.** Use `window-ctl.js hide` after page loads; `window-ctl.js show`
   only when user interaction is needed (auth, clarification).
 - **Use named session** (`-s=deep`) so the session persists across commands.
-- **Use local playwright-cli** — always `"$HOME/.deep-research/playwright-cli/playwright-cli.js"`,
+- **Use local playwright-cli** — always `"$HOME/.deep-research/pw"`,
   never the global `playwright-cli`.
 - **Prefer `snapshot` over `screenshot`.** Snapshots are structured text — cheaper,
   faster, and give you element refs. Snapshots work while window is hidden.

@@ -1,0 +1,45 @@
+--- node_modules/playwright-core/lib/server/browserType.js	2026-03-25 12:28:21
++++ node_modules/playwright-core/lib/server/browserType.js	2026-03-25 11:59:15
+@@ -196,10 +196,23 @@
+     let transport = void 0;
+     let browserProcess = void 0;
+     const exitPromise = new import_manualPromise.ManualPromise();
+-    const { launchedProcess, gracefullyClose, kill } = await (0, import_processLauncher.launchProcess)({
+-      command: prepared.executable,
++    // Start-minimized (macOS): use DYLD_INSERT_LIBRARIES to hook NSWindow and prevent flash
++    let _launchEnv = this.amendEnvironment(env, prepared.userDataDir, isPersistent, options);
++    let _launchCmd = prepared.executable;
++    if (options.args?.includes?.("--start-minimized") && !options.headless && process.platform === "darwin") {
++      const _path = require("path");
++      const _fs = require("fs");
++      const _dylibPath = _path.join(require("os").homedir(), ".deep-research", "window_suppress.dylib");
++      const _resignedChrome = _path.join(require("os").homedir(), ".deep-research", "Chrome.app", "Contents", "MacOS", "Google Chrome");
++      if (_fs.existsSync(_dylibPath) && _fs.existsSync(_resignedChrome)) {
++        _launchCmd = _resignedChrome;
++        _launchEnv = { ..._launchEnv, DYLD_INSERT_LIBRARIES: _dylibPath };
++      }
++    }
++    const { launchedProcess, gracefullyClose, kill } = await (0, import_processLauncher.launchProcess)({
++      command: _launchCmd,
+       args: prepared.browserArguments,
+-      env: this.amendEnvironment(env, prepared.userDataDir, isPersistent, options),
++      env: _launchEnv,
+       handleSIGINT,
+       handleSIGTERM,
+       handleSIGHUP,
+@@ -224,6 +237,7 @@
+           browserProcess.onclose(exitCode, signal);
+       }
+     });
++    let minimizePromise = Promise.resolve();
+     async function closeOrKill(timeout) {
+       let timer;
+       try {
+@@ -262,6 +276,7 @@
+         const stdio = launchedProcess.stdio;
+         transport = new import_pipeTransport.PipeTransport(stdio[3], stdio[4]);
+       }
++      await minimizePromise;
+       return { browserProcess, artifactsDir: prepared.artifactsDir, userDataDir: prepared.userDataDir, transport };
+     } catch (error) {
+       await closeOrKill(import_time.DEFAULT_PLAYWRIGHT_TIMEOUT).catch(() => {

@@ -1,0 +1,33 @@
+--- node_modules/playwright-core/lib/server/chromium/crBrowser.js	2026-03-25 12:28:21
++++ node_modules/playwright-core/lib/server/chromium/crBrowser.js	2026-03-25 11:59:34
+@@ -89,6 +89,7 @@
+       return browser;
+     }
+     browser._defaultContext = new CRBrowserContext(browser, void 0, options.persistent);
++    const startMinimized = options.originalLaunchOptions?.args?.includes?.("--start-minimized") && options.headful;
+     await Promise.all([
+       session.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true }).then(async () => {
+         await session.send("Target.getTargetInfo");
+@@ -96,6 +97,22 @@
+       browser._defaultContext._initialize()
+     ]);
+     await browser._waitForAllPagesToBeInitialized();
++    // Start-minimized: transition from DYLD miniaturize to CDP-managed offscreen state
++    // DYLD hook (window_suppress.dylib) miniaturizes window on creation (zero flash).
++    // Here we remove the signal file, un-minimize, and move offscreen so screenshots work.
++    if (startMinimized) {
++      try {
++        require("child_process").execSync("rm -f /tmp/.chrome-suppress-*", { stdio: "ignore" });
++        await new Promise(r => setTimeout(r, 100));
++        const targets = await session.send("Target.getTargets");
++        const pageTarget = targets.targetInfos?.find((t) => t.type === "page");
++        if (pageTarget) {
++          const win = await session.send("Browser.getWindowForTarget", { targetId: pageTarget.targetId });
++          await session.send("Browser.setWindowBounds", { windowId: win.windowId, bounds: { windowState: "normal" } });
++          await session.send("Browser.setWindowBounds", { windowId: win.windowId, bounds: { left: -9999, top: -9999, width: 800, height: 600 } });
++        }
++      } catch {}
++    }
+     return browser;
+   }
+   async doCreateNewContext(options) {
