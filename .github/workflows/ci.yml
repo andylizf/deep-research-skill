@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          for f in SKILL.md setup.sh window_suppress.m window_alpha.m window-ctl.js \
+                   start-minimized-browserType.patch start-minimized-crBrowser.patch \
+                   INSTALL.md; do
+            test -f "$f" || { echo "Missing: $f"; exit 1; }
+          done
+          echo "All files present"
+
+      - name: Validate SKILL.md frontmatter
+        run: |
+          head -20 SKILL.md | grep -q "^name:" || { echo "Missing name in frontmatter"; exit 1; }
+          head -20 SKILL.md | grep -q "^description:" || { echo "Missing description in frontmatter"; exit 1; }
+          echo "Frontmatter OK"
+
+      - name: Compile window_suppress.dylib
+        run: |
+          cc -dynamiclib -framework AppKit -framework Foundation \
+             -o window_suppress.dylib window_suppress.m
+          test -f window_suppress.dylib
+          echo "window_suppress.dylib compiled"
+
+      - name: Compile window_alpha
+        run: |
+          cc -framework CoreGraphics -framework CoreFoundation \
+             -o window_alpha window_alpha.m
+          test -x window_alpha
+          echo "window_alpha compiled"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax check window-ctl.js
+        run: node --check window-ctl.js
+
+      - name: Install playwright-cli and apply patches
+        run: |
+          mkdir -p /tmp/pw-test
+          cd /tmp/pw-test
+          npm init -y --silent
+          npm install @playwright/cli --silent
+          for p in $GITHUB_WORKSPACE/start-minimized-*.patch; do
+            patch -p0 < "$p"
+          done
+          echo "Patches applied"
+
+      - name: Shellcheck setup.sh
+        run: shellcheck setup.sh || true

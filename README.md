@@ -1,5 +1,7 @@
 # deep-research-skill
 
+[![CI](https://github.com/andylizf/deep-research-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/andylizf/deep-research-skill/actions/workflows/ci.yml)
+
 Use ChatGPT's [Deep Research](https://openai.com/index/introducing-deep-research/) from Claude Code. Type `/deep-research`, get a full report back.
 
 The Deep Research API (o3/o4-mini) doesn't have the visual browser, GPT-5.2 model, or site-scoping that the ChatGPT GUI version has. This skill drives the real thing.
