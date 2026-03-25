@@ -4,7 +4,9 @@
 
 Use ChatGPT's [Deep Research](https://openai.com/index/introducing-deep-research/) from Claude Code. Type `/deep-research`, get a full report back.
 
-This drives the actual ChatGPT GUI, not the API. The API version (o3/o4-mini) is a different, weaker model without the visual browser, GPT-5.2, clarification step, or site-scoping. The GUI version is what you get when you click "Deep Research" on chatgpt.com, and that's what this skill automates.
+This drives the actual ChatGPT web UI. If you have a ChatGPT Plus/Pro subscription, it just works. No API keys, no separate billing, no token budgets to worry about.
+
+Why not use the Deep Research API? Because it's a different product. The API runs o3/o4-mini under the hood and requires you to restructure your prompts around its tool-call interface. The web version uses GPT-5.2 with a visual browser that actually visits pages, asks you clarifying questions before starting, and lets you scope research to specific sites. They produce noticeably different results.
 
 <!-- TODO: add a GIF showing /deep-research in action -->
 
