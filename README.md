@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/andylizf/deep-research-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/andylizf/deep-research-skill/actions/workflows/ci.yml)
 
-A Claude Code skill that runs [ChatGPT Deep Research](https://openai.com/index/introducing-deep-research/) for you. Type `/deep-research <question>` and get a full report back.
+A **CUI** (Computer Use Interface) that runs [ChatGPT Deep Research](https://openai.com/index/introducing-deep-research/) from Claude Code. Type `/deep-research <question>` and get a full report back.
 
-It automates the real ChatGPT web UI, so all you need is a ChatGPT Plus or Pro subscription. No API keys needed.
+CLI wraps functionality for humans in a terminal. CUI wraps GUI-only web products into something agents can drive. This one wraps ChatGPT's Deep Research -- all you need is a ChatGPT Plus or Pro subscription, no API keys.
 
 ## Why the web version?
 
