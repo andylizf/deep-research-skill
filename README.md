@@ -8,7 +8,7 @@ It automates the real ChatGPT web UI, so all you need is a ChatGPT Plus or Pro s
 
 ## Why the web version?
 
-OpenAI has a [Deep Research API](https://developers.openai.com/api/docs/guides/deep-research), but it's not the same thing. The API uses o3/o4-mini, bills per token, expects fully-formed prompts, and requires you to wire up data sources through the Responses API yourself. The web version runs GPT-5.2, asks clarifying questions before it starts, supports site-scoping, and comes bundled with your existing ChatGPT subscription (25 queries/mo on Plus, 250 on Pro). Different model, different results.
+OpenAI has a [Deep Research API](https://developers.openai.com/api/docs/guides/deep-research), but it's not the same thing. The API uses o3/o4-mini, bills per token, expects fully-formed prompts, and requires you to wire up data sources through the Responses API yourself. The web version runs their most powerful model, asks clarifying questions before it starts, supports site-scoping, and comes bundled with your existing ChatGPT subscription (25 queries/mo on Plus, 250 on Pro). Different model, different results.
 
 <!-- TODO: add a GIF showing /deep-research in action -->
 
