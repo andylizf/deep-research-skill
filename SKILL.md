@@ -31,7 +31,7 @@ Deep Research moved to a different URL, export button relocated inside/outside i
 
 ## Paths
 
-All skill files live under `~/.deep-research/`. Define this alias for all commands:
+All runtime files live under `~/.deep-research/`. Define this for all commands:
 
 ```bash
 PW="$HOME/.deep-research/pw"
@@ -58,10 +58,10 @@ test -x "$HOME/.deep-research/pw" \
   && echo "READY" || echo "SETUP_NEEDED"
 ```
 
-If SETUP_NEEDED, run the setup script (from the skill repo):
+If SETUP_NEEDED, run the setup script from this skill's directory:
 
 ```bash
-bash ~/.tmp/deep-research-skill/setup.sh
+bash <this-skill-directory>/setup.sh
 ```
 
 The script is idempotent — safe to re-run after Chrome updates or source changes.
@@ -138,7 +138,7 @@ SIGUSR-based alpha control for ongoing hide/show.
 ### Window Control Script
 
 ```bash
-node ~/.tmp/deep-research-skill/window-ctl.js show|hide|toggle [cdp-port]
+node ~/.deep-research/window-ctl.js show|hide|toggle [cdp-port]
 ```
 
 - `show` — SIGUSR2 + CDP un-minimize + position at (100,100)
@@ -203,14 +203,14 @@ Assess state from snapshot:
    email input, etc.
 3. **Show the browser window** so the user can see and interact:
    ```bash
-   node ~/.tmp/deep-research-skill/window-ctl.js show
+   node ~/.deep-research/window-ctl.js show
    ```
 4. Tell user which login options are available and ask them to complete login
 5. **Wait for user confirmation** — do NOT proceed until they reply
 6. `"$PW" -s=deep snapshot` → verify `idle`
 7. **Hide again** after auth is complete:
    ```bash
-   node ~/.tmp/deep-research-skill/window-ctl.js hide
+   node ~/.deep-research/window-ctl.js hide
    ```
 
 ### Phase 1: New Chat

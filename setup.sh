@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Deep Research skill — one-time setup
 # Usage:
-#   git clone https://github.com/andylizf/deep-research-skill.git ~/.tmp/deep-research-skill
-#   bash ~/.tmp/deep-research-skill/setup.sh
+#   git clone https://github.com/andylizf/deep-research-skill.git ~/.claude/skills/deep-research-skill
+#   bash ~/.claude/skills/deep-research-skill/setup.sh
 set -euo pipefail
 
 DIR="$HOME/.deep-research"
@@ -81,6 +81,9 @@ EOF
 else
   echo "==> cli.config.json exists"
 fi
+
+# ── 6. Copy window-ctl.js to runtime dir ──
+cp "$SKILL_DIR/window-ctl.js" "$DIR/window-ctl.js"
 
 echo ""
 echo "Setup complete. Files in $DIR:"
