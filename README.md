@@ -23,11 +23,13 @@ Fetch and follow the instructions at https://raw.githubusercontent.com/andylizf/
 Or manually:
 
 ```bash
-git clone https://github.com/andylizf/deep-research-skill.git ~/.claude/skills/deep-research-skill
-bash ~/.claude/skills/deep-research-skill/setup.sh
-```
+# 1. Install web-plane (the browser layer)
+npm install -g web-plane
+web-plane install
 
-Everything gets installed locally under `~/.deep-research/`. Nothing touches your global npm. Run `setup.sh` again after Chrome updates.
+# 2. Install the skill
+git clone https://github.com/andylizf/deep-research-skill.git ~/.claude/skills/deep-research-skill
+```
 
 ## Usage
 
@@ -41,13 +43,11 @@ Everything gets installed locally under `~/.deep-research/`. Nothing touches you
 
 The skill opens a Chrome window you can't see, submits your query, waits 5-30 minutes, and brings back the Markdown report with sources. If you need to log in to ChatGPT, it'll pop the window up and wait for you.
 
-## How the invisible browser works
+## How it works
 
-Cloudflare blocks headless Chrome, so the browser has to run headed. But nobody wants a Chrome window jumping in their face mid-work.
+This skill uses [web-plane](https://github.com/andylizf/web-plane) as its browser layer. web-plane runs your real system Chrome (not Chrome for Testing), so Cloudflare can't tell it's automated. The browser window is invisible from the first frame via DYLD injection -- no flash, no distraction.
 
-We use DYLD injection to hook `NSWindow.makeKeyAndOrderFront:` inside Chrome's process and replace it with `miniaturize:`. The window never appears. Once Playwright's CDP session connects, we remove the hook, un-minimize the window, and park it offscreen so screenshots still work. For toggling visibility later (e.g. when you need to log in), we send `SIGUSR1`/`SIGUSR2` to Chrome, and the injected hook sets `NSWindow.alphaValue` to 0 or 1.
-
-This needs a re-signed Chrome binary (the stock one has `library-validation` which blocks DYLD injection). `setup.sh` makes an APFS clone of your Chrome (~5 MB extra disk) and handles the codesigning.
+The skill itself is just SKILL.md: a set of instructions that tell Claude how to navigate ChatGPT's Deep Research UI, submit queries, wait for results, and extract the report.
 
 ## Requirements
 
@@ -56,17 +56,14 @@ This needs a re-signed Chrome binary (the stock one has `library-validation` whi
 - Node.js >= 18
 - Xcode Command Line Tools (`xcode-select --install`)
 - ChatGPT Plus or Pro
+- [web-plane](https://github.com/andylizf/web-plane) (`npm install -g web-plane`)
 
 ## Files
 
 ```
-SKILL.md                         # instructions Claude follows for /deep-research
-INSTALL.md                       # meta-install instructions for the one-liner
-setup.sh                         # sets up ~/.deep-research/
-window_suppress.m                # the DYLD hook (Objective-C)
-window_alpha.m                   # CoreGraphics alpha helper
-window-ctl.js                    # show/hide/toggle the browser window
-start-minimized-*.patch          # two patches for playwright-core
+SKILL.md         # instructions Claude follows for /deep-research
+INSTALL.md       # meta-install instructions for the one-liner
+README.md        # this file
 ```
 
 ## License
