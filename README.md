@@ -6,7 +6,12 @@ Use ChatGPT's [Deep Research](https://openai.com/index/introducing-deep-research
 
 This drives the actual ChatGPT web UI. If you have a ChatGPT Plus/Pro subscription, it just works. No API keys, no separate billing, no token budgets to worry about.
 
-Why not use the Deep Research API? Because it's a different product. The API runs o3/o4-mini under the hood and requires you to restructure your prompts around its tool-call interface. The web version uses GPT-5.2 with a visual browser that actually visits pages, asks you clarifying questions before starting, and lets you scope research to specific sites. They produce noticeably different results.
+Why not use the [Deep Research API](https://developers.openai.com/api/docs/guides/deep-research)? Because it's a different product:
+
+- **Different model.** The web version runs GPT-5.2. The API runs o3/o4-mini.
+- **No clarification step.** The web version asks follow-up questions to refine your query before starting. The API expects fully-formed prompts and starts immediately.
+- **Different interface.** The API uses the Responses API with tool-call semantics. You need to wire up data sources (web search, MCP, file search) yourself and handle streaming events. The web version just takes a question.
+- **Different pricing.** The API bills per token. The web version is included in your ChatGPT Plus ($20/mo, 25 queries) or Pro ($200/mo, 250 queries) subscription.
 
 <!-- TODO: add a GIF showing /deep-research in action -->
 
