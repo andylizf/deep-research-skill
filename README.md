@@ -1,6 +1,10 @@
-# Deep Research Skill for Claude Code
+# deep-research-skill
 
-Run [ChatGPT Deep Research](https://openai.com/index/introducing-deep-research/) from Claude Code. The skill automates a real browser to navigate ChatGPT's Deep Research mode and returns the full report — with zero window flash on macOS.
+Use ChatGPT's [Deep Research](https://openai.com/index/introducing-deep-research/) from Claude Code. Type `/deep-research`, get a full report back.
+
+The Deep Research API (o3/o4-mini) doesn't have the visual browser, GPT-5.2 model, or site-scoping that the ChatGPT GUI version has. This skill drives the real thing.
+
+<!-- TODO: add a GIF showing /deep-research in action -->
 
 ## Install
 
@@ -10,12 +14,14 @@ Paste this into Claude Code:
 Fetch and follow the instructions at https://raw.githubusercontent.com/andylizf/deep-research-skill/main/INSTALL.md
 ```
 
-Or install manually:
+Or do it yourself:
 
 ```bash
 git clone https://github.com/andylizf/deep-research-skill.git ~/.claude/skills/deep-research-skill
 bash ~/.claude/skills/deep-research-skill/setup.sh
 ```
+
+`setup.sh` installs everything locally under `~/.deep-research/`. Nothing goes into your global npm. Run it again after Chrome updates.
 
 ## Usage
 
@@ -23,58 +29,39 @@ bash ~/.claude/skills/deep-research-skill/setup.sh
 /deep-research What are the latest advances in protein structure prediction?
 ```
 
-Options:
-- `--lang <language>` — request report in a specific language
-- `--sites <domains>` — restrict to specific sites (e.g. `--sites arxiv.org,scholar.google.com`)
+```
+/deep-research --lang zh --sites arxiv.org,scholar.google.com transformer architectures for time series
+```
 
-## What It Does
+The skill opens an invisible Chrome, submits your query, waits 5-30 minutes, and brings back the full Markdown report with sources. If you need to log in to ChatGPT, it'll show you the browser window and wait.
 
-1. Launches a headed Chrome instance (invisible — no window flash, no focus steal)
-2. Navigates to ChatGPT's Deep Research page
-3. Submits your query, shows the research plan
-4. Polls until research completes (5–30 min), updates you every 2 minutes
-5. Exports the report as Markdown and returns it to you
-6. If login is needed, shows the browser window for you to authenticate
+## Why is this hard?
 
-## How It Works
+Cloudflare blocks headless Chrome, so the browser has to run headed. But you don't want a Chrome window popping up and stealing focus every time you run a query.
 
-Cloudflare blocks headless browsers, so Deep Research requires a real headed Chrome. The skill uses a multi-phase approach to keep the window invisible:
+The trick: a DYLD-injected hook intercepts `NSWindow.makeKeyAndOrderFront:` inside Chrome's process and calls `miniaturize:` instead. The window never renders a single frame. After Playwright's CDP session is up, we un-minimize and move the window offscreen so screenshots work. To toggle visibility later, we send `SIGUSR1`/`SIGUSR2` to Chrome, which the hook handles by setting `NSWindow.alphaValue` to 0 or 1.
 
-| Phase | Mechanism | Purpose |
-|-------|-----------|---------|
-| Launch | DYLD injection (`window_suppress.dylib`) | Hooks `NSWindow` methods to miniaturize on creation — zero flash |
-| CDP ready | Playwright patches (`crBrowser.js`) | Removes DYLD signal, un-minimizes, moves offscreen — screenshots work |
-| Hide/Show | Unix signals (`SIGUSR1`/`SIGUSR2`) | Sets window alpha to 0/1 via injected hook — no permissions needed |
-
-### Setup Details
-
-`setup.sh` handles everything automatically:
-
-- Installs `@playwright/cli` **locally** at `~/.deep-research/` (no global pollution) and applies two small patches
-- Creates an APFS clone of Chrome and re-signs the binary (removes `library-validation` for DYLD injection)
-- Compiles the native DYLD hook from source
-
-The Chrome clone is copy-on-write (~5 MB extra disk for the re-signed binary). Re-run `setup.sh` after Chrome updates.
+This requires a re-signed copy of Chrome (to strip `library-validation` for DYLD injection). `setup.sh` creates an APFS clone (~5 MB extra disk) and handles the signing.
 
 ## Requirements
 
-- **macOS** (DYLD injection is macOS-specific)
-- **Google Chrome** installed at `/Applications/Google Chrome.app`
-- **Node.js** ≥ 18 (for playwright-cli)
-- **Xcode Command Line Tools** (`xcode-select --install`) for compiling native code
-- **ChatGPT account** with Deep Research access
+- macOS (the window management is macOS-specific)
+- Google Chrome
+- Node.js >= 18
+- Xcode Command Line Tools (`xcode-select --install`)
+- A ChatGPT account with Deep Research access
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `SKILL.md` | Skill instructions for Claude Code |
-| `INSTALL.md` | Meta-install instructions (for one-line install) |
-| `setup.sh` | One-command setup script (idempotent) |
-| `window_suppress.m` | DYLD hook — miniaturize on launch + SIGUSR hide/show |
-| `window_alpha.m` | CoreGraphics alpha tool (fallback) |
-| `window-ctl.js` | Show/hide/toggle browser window via CDP + signals |
-| `start-minimized-*.patch` | Playwright patches for zero-flash launch |
+```
+SKILL.md                         # what Claude reads when you say /deep-research
+INSTALL.md                       # meta-install instructions for the one-liner
+setup.sh                         # sets up everything under ~/.deep-research/
+window_suppress.m                # DYLD hook: zero-flash launch + SIGUSR hide/show
+window_alpha.m                   # CoreGraphics alpha tool (fallback)
+window-ctl.js                    # show/hide/toggle the browser window
+start-minimized-*.patch          # two small patches for playwright-core
+```
 
 ## License
 
