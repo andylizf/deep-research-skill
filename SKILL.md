@@ -8,6 +8,26 @@ description: Execute OpenAI Deep Research via ChatGPT browser GUI. Uses web-plan
 You are a GUI automation sub-agent. Your job is to operate ChatGPT's Deep Research
 through a real browser and return the research report to the user.
 
+## Run this in a subagent
+
+Do the browser driving inside a **subagent**, not in the main conversation.
+
+A run polls for 5-30 minutes and every poll produces an accessibility-tree snapshot —
+hundreds of lines of YAML each, plus any screenshots. All of it lands in whichever
+context is doing the driving, and almost none of it matters once the next snapshot
+supersedes it. Drive from the main conversation and you fill it with page dumps it
+will never read again; drive from a subagent and the main conversation receives the
+finished report and nothing else.
+
+So the contract for the subagent is:
+
+- **Return conclusions, never raw material.** The extracted report and a one-line
+  status. No snapshots, no accessibility trees, no `.playwright-cli/` file dumps.
+- **The one thing a subagent cannot do is hand over the keyboard.** Login, a captcha,
+  an OS-level block — for any of these, stop and return a *request*: what is on
+  screen, exactly what the human has to do, and which session to look at. The parent
+  relays it, the human acts, and the subagent picks up where it left off.
+
 ## Last verified
 
 - **Date:** 2026-03-25
@@ -58,8 +78,11 @@ Parse these from the user's input before starting. Everything after options is t
 
 ## web-plane Quick Reference
 
-All commands use the named session `-s=deep`.
-Shorthand: `wp` = `web-plane -s=deep`
+Every command carries the session picked in Phase 0. Throughout this document
+`<profile>` is a **placeholder**: substitute the actual profile name you chose, and
+use the same one in every command for the whole run.
+
+Shorthand: `wp` = `web-plane -s=<profile>`
 
 | Command | Purpose |
 |---------|---------|
@@ -73,36 +96,67 @@ Shorthand: `wp` = `web-plane -s=deep`
 | `wp hover <ref>` | Hover over element |
 | `wp eval "js"` | Execute JavaScript on the page |
 | `wp close` | End browser session |
-| `web-plane show` | Show browser window (for auth) |
-| `web-plane hide` | Hide browser window (screenshots still work) |
-| `web-plane toggle` | Toggle window visibility |
-| `web-plane status` | Check browser status |
+| `wp show` | Show browser window (for auth) |
+| `wp hide` | Hide browser window (screenshots still work) |
+| `wp toggle` | Toggle window visibility |
+| `wp status` | Check browser status (PID, session, visibility) |
 
 **Snapshots** return the accessibility tree with element references like `e1`, `e5`, `e12`.
 Use these refs for subsequent click/fill/type commands. Always `snapshot` before interacting.
 
 **Important:** In actual commands, always use the full form:
 ```bash
-web-plane -s=deep <command>
+web-plane -s=<profile> <command>
 ```
 `wp` is just shorthand for this document's readability.
+
+**`-s` is not optional on `show`/`hide`/`status` either** — this is the one people
+drop, because those commands read like they act on "the browser". They don't. With
+more than one web-plane session running, an unqualified `web-plane show` picks a
+browser by process order and then prints `Window shown` about *that* one, while the
+session you are driving stays parked offscreen at alpha 0. You get a success message
+and an invisible browser, and the cause is nowhere in the output. Recent web-plane
+refuses the ambiguous case instead of guessing; older versions guess silently. Name
+the session every time.
 
 ## Window Control — Zero Flash
 
 web-plane handles all window management automatically:
 
-- **Launch:** `web-plane open` starts Chrome with zero flash (DYLD hook suppresses window)
+- **Launch:** `wp open` starts Chrome with zero flash (DYLD hook suppresses window)
 - **Hidden by default:** After CDP connects, window moves offscreen (screenshots work)
-- **Show:** `web-plane show` makes window visible (for user auth)
-- **Hide:** `web-plane hide` makes window transparent (screenshots still work)
+- **Show:** `wp show` makes window visible (for user auth)
+- **Hide:** `wp hide` makes window transparent (screenshots still work)
 
 ### Window Control Strategy
 
 1. **Launch** → zero flash (automatic)
-2. **Auth needed** → `web-plane show` so user can interact
-3. **Auth done** → `web-plane hide`
+2. **Auth needed** → `wp show` so user can interact
+3. **Auth done** → `wp hide`
 4. **Researching** → stays hidden, poll with snapshots
 5. **Done** → extract results while hidden, then close
+
+### When `show` says it worked but nothing is visible
+
+`Window shown` is a claim, not a receipt. Two different failures produce it, and the
+screen looks identical in both:
+
+1. **You showed a different browser.** Run `web-plane -s=<profile> status` and check
+   the PID against the session you are driving. This is what an unqualified
+   `web-plane show` does when several sessions are running.
+2. **A macOS Screen Time / parental-control block.** This one is genuinely invisible:
+   the "you've reached your limit" sheet is drawn **on the Chrome window**, so while
+   the window is transparent the notice is transparent too. You can see neither
+   Chrome nor the reason Chrome isn't there, and every web-plane command keeps
+   reporting success. A page `screenshot` cannot reveal it either — that captures the
+   page, not the screen. Take a real screen grab and look at it:
+
+   ```bash
+   screencapture -x ./tmp/screen.png
+   ```
+
+   If a Screen Time sheet is on it, only the human can clear it — surface it as a
+   handoff request with what you saw. Do not try to click through it.
 
 ## State Recognition
 
@@ -122,14 +176,56 @@ After each `snapshot`, identify the current state from the accessibility tree:
 
 ## Execution Flow
 
-### Phase 0: Launch & Check Session
+### Phase 0: Pick the profile, then launch
+
+**Never hardcode the session name.** `-s=<name>` selects a *login identity* — a Chrome
+profile on disk with its own cookies — and web-plane will happily create an empty one
+for any name you invent. Ask the disk which profile holds the identity instead:
+
+```bash
+web-plane profiles chatgpt.com
+```
+
+Two possible answers:
+
+- **A profile is named** (`main (running) — chatgpt.com`) → that is your session.
+- **`No profile holds a session for: chatgpt.com`** → it then lists the profiles with
+  how many sites each is logged into. Take the one with the **most logins**. That is
+  the user's real identity. Do *not* take one marked `(empty)`, and do *not* invent a
+  new name however well it describes the task.
+
+```
+No profile holds a session for: chatgpt.com
+A login is needed. Pick the identity profile you already use, not a new one:
+  main  (logged into 22 site(s))     ← this one
+  pton  (logged into 2 site(s))
+  deep  (empty)                      ← never this one, however apt the name
+```
+
+Substitute that name for `<profile>` in every command from here on.
+
+**Why the empty profile is the expensive mistake.** A fresh profile is a browser the
+site has never seen: logged out, and a new device even after you log in. From a
+logged-out ChatGPT the obvious next control is the login modal's *Continue with
+Google* / *Continue with Apple* button — and if the user's ChatGPT account is not that
+OAuth identity, clicking it does not fail with "no such account". It silently
+**registers a brand-new account**: no history, no subscription, no Deep Research, and
+no way to undo it. Never click an OAuth button, and never open a fresh profile to
+"start clean".
+
+**`profiles` under-reports, so do not read a "no" as proof.** It decides whether a
+profile holds a session from a fixed list of well-known cookie names, and ChatGPT's
+(`__Secure-next-auth.session-token`) is not on it — a profile that is genuinely logged
+into ChatGPT still prints as holding no chatgpt.com session. So treat that answer as
+"start from the user's main identity and go look", not as "a login is required". The
+page is the authority; the snapshot below is what settles it.
 
 ```bash
 # Launch browser — window starts hidden automatically (zero flash)
-web-plane -s=deep open https://chatgpt.com
+web-plane -s=<profile> open https://chatgpt.com
 
 # Snapshot to assess state
-web-plane -s=deep snapshot
+web-plane -s=<profile> snapshot
 ```
 
 Snapshot output is written to `.playwright-cli/page-*.yml` files. Read the latest
@@ -142,27 +238,36 @@ Assess state from snapshot:
 
 ### Auth (only if needed)
 
+Before anything else, re-check that you are on the right profile — a `login_required`
+snapshot from the user's main identity means something very different (session
+expired) than the same snapshot from an empty profile (wrong profile, go back to
+Phase 0).
+
 1. **Click the "Log in" button** yourself — find it in snapshot (e.g. `button "Log in"`)
 2. Snapshot the login page — look for "Continue with Google", "Continue with Apple",
    email input, etc.
-3. **Show the browser window** so the user can see and interact:
+3. **Never click any of them.** Which identity the account uses is not visible from
+   the page, and the wrong OAuth button creates a second account instead of failing.
+   Staging the login screen is your job; choosing on it is the human's.
+4. **Show the browser window** so the user can see and interact:
    ```bash
-   web-plane show
+   web-plane -s=<profile> show
    ```
-4. Tell user which login options are available and ask them to complete login
-5. **Wait for user confirmation** — do NOT proceed until they reply
-6. `web-plane -s=deep snapshot` → verify `idle`
-7. **Hide again** after auth is complete:
+5. Tell the user which login options are on screen and ask them to complete login.
+   From a subagent this is a handoff: return the request and stop, don't poll.
+6. **Wait for user confirmation** — do NOT proceed until they reply
+7. `web-plane -s=<profile> snapshot` → verify `idle`
+8. **Hide again** after auth is complete:
    ```bash
-   web-plane hide
+   web-plane -s=<profile> hide
    ```
 
 ### Phase 1: New Chat
 
-1. `web-plane -s=deep snapshot` to find the "New chat" button or use shortcut
-2. Look for a "New chat" element in the snapshot, `web-plane -s=deep click <ref>`
-3. Or try: `web-plane -s=deep eval "document.querySelector('[data-testid=\"new-chat-button\"]')?.click()"`
-4. `web-plane -s=deep snapshot` → confirm empty conversation
+1. `web-plane -s=<profile> snapshot` to find the "New chat" button or use shortcut
+2. Look for a "New chat" element in the snapshot, `web-plane -s=<profile> click <ref>`
+3. Or try: `web-plane -s=<profile> eval "document.querySelector('[data-testid=\"new-chat-button\"]')?.click()"`
+4. `web-plane -s=<profile> snapshot` → confirm empty conversation
 
 ### Phase 2: Navigate to Deep Research
 
@@ -170,12 +275,12 @@ Deep Research has a dedicated page at `chatgpt.com/deep-research`. Two approache
 
 **Option A** (preferred): Look for "Deep research" link in the sidebar snapshot
 ```bash
-web-plane -s=deep click <deep_research_sidebar_ref>
+web-plane -s=<profile> click <deep_research_sidebar_ref>
 ```
 
 **Option B** (fallback): Navigate directly
 ```bash
-web-plane -s=deep goto https://chatgpt.com/deep-research
+web-plane -s=<profile> goto https://chatgpt.com/deep-research
 ```
 
 Verify: snapshot should show URL `/deep-research` and placeholder "Ask a complex question.
@@ -183,7 +288,7 @@ Get a full report, with sources."
 
 If Deep Research page shows upgrade prompt or is unavailable:
 - Tell user: "Deep Research not available. Check your ChatGPT subscription."
-- `web-plane -s=deep close`
+- `web-plane -s=<profile> close`
 - Abort
 
 ### Phase 3: Configure Site Restrictions (if --sites)
@@ -195,13 +300,13 @@ If `--sites` provided:
 
 ### Phase 4: Submit Query
 
-1. `web-plane -s=deep snapshot` — find the textbox (placeholder "Ask a complex question")
+1. `web-plane -s=<profile> snapshot` — find the textbox (placeholder "Ask a complex question")
 2. Build prompt:
    - If `--lang`: prepend "Write the report in {language}."
    - Append the user's research query
-3. `web-plane -s=deep fill <input_ref> "{full_prompt}"`
+3. `web-plane -s=<profile> fill <input_ref> "{full_prompt}"`
 4. Find "Send prompt" button in snapshot and click it
-5. `web-plane -s=deep snapshot` → should show `plan_review` or `researching`
+5. `web-plane -s=<profile> snapshot` → should show `plan_review` or `researching`
 
 ### Phase 5: Review Plan
 
@@ -230,7 +335,7 @@ If ChatGPT asks a clarifying question instead of showing a plan:
 4. If "skip" → type "Proceed with your best judgment. Be thorough and comprehensive."
 5. Otherwise → type user's response verbatim
 6. Find input, fill, send
-7. `web-plane -s=deep snapshot` → confirm `researching`
+7. `web-plane -s=<profile> snapshot` → confirm `researching`
 
 ### Phase 6: Wait for Completion
 
@@ -241,7 +346,7 @@ elapsed = 0
 while elapsed < 1800:  # 30 min max
     sleep 60
     elapsed += 60
-    snapshot = web-plane -s=deep snapshot
+    snapshot = web-plane -s=<profile> snapshot
 
     # Check for "Stop research" button → still researching
     if snapshot contains "Stop research":
@@ -255,7 +360,7 @@ while elapsed < 1800:  # 30 min max
 
     # Check for errors
     if snapshot contains "Something went wrong" or rate limit text:
-        web-plane show
+        web-plane -s=<profile> show
         tell user what happened
         abort
 
@@ -270,8 +375,8 @@ The browser stays hidden during polling. Snapshots work fine while hidden.
 The report is inside an **iframe**. ChatGPT provides built-in export buttons.
 
 **Step 1: Export to Markdown** (gets a clean .md file with full content)
-1. `web-plane -s=deep snapshot` — find `button "Export"` inside the iframe
-2. `web-plane -s=deep click <export_ref>` — opens export menu
+1. `web-plane -s=<profile> snapshot` — find `button "Export"` inside the iframe
+2. `web-plane -s=<profile> click <export_ref>` — opens export menu
 3. Snapshot again — find `button "Export to Markdown"`, click it
 4. The file downloads to `.playwright-cli/deep-research-report.md`
 5. Read the downloaded file — this is the cleanest extraction method
@@ -290,7 +395,7 @@ The report is inside an **iframe**. ChatGPT provides built-in export buttons.
 
 **Fallback** (if Export buttons are not found):
 - Parse the snapshot YAML directly — the accessibility tree contains full report text
-- Or use `web-plane -s=deep screenshot` + vision extraction
+- Or use `web-plane -s=<profile> screenshot` + vision extraction
 
 ### Phase 8: Return Results
 
@@ -301,16 +406,24 @@ The report is inside an **iframe**. ChatGPT provides built-in export buttons.
 4. Present the clean report to the user
 5. Close the browser session:
    ```bash
-   web-plane -s=deep close
+   web-plane -s=<profile> close
    ```
+
+Running as a subagent, this is your entire return value: the cleaned report, the
+metadata line, and one line of status. The snapshots, the accessibility trees, and
+the `.playwright-cli/` files stay here — the parent context has no use for them and
+they are the bulk of what this skill generates.
 
 ## Error Handling
 
 | Scenario | Action |
 |----------|--------|
 | web-plane not found | `npm install -g web-plane && web-plane install`, abort |
-| Login needed | Click "Log in" button, `web-plane show`, tell user to enter credentials |
-| Captcha / Cloudflare | `web-plane show` → tell user to solve → wait |
+| Login needed | Click "Log in" button, `wp show`, tell user to enter credentials |
+| Captcha / Cloudflare | `wp show` → tell user to solve → wait |
+| No profile logged into ChatGPT | Use the profile with the most logins — never an empty one, never a new name (Phase 0) |
+| `wp show` succeeds, screen blank | Check the PID with `wp status`; then `screencapture -x` for a Screen Time overlay |
+| "N sessions are running — say which one" | You dropped `-s=<profile>`. Add it |
 | Rate limited | Return error with details |
 | Network error | Wait 10s, retry `goto` once, then abort |
 | Timeout (30min) | Extract partial results if any, note timeout |
@@ -323,9 +436,13 @@ The report is inside an **iframe**. ChatGPT provides built-in export buttons.
 ## Important Rules
 
 - **Never enter credentials.** Only the user handles login.
-- **Keep window hidden.** Use `web-plane hide` after page loads; `web-plane show`
+- **Never click an OAuth button** ("Continue with Google/Apple"). On the wrong
+  identity it creates a second account instead of failing.
+- **Keep window hidden.** Use `wp hide` after page loads; `wp show`
   only when user interaction is needed (auth, clarification).
-- **Use named session** (`-s=deep`) so the session persists across commands.
+- **Every command carries `-s=<profile>`**, including `show`, `hide`, and `status`.
+  The profile comes from Phase 0's `web-plane profiles chatgpt.com`, never from a
+  name written in this document.
 - **Prefer `snapshot` over `screenshot`.** Snapshots are structured text — cheaper,
   faster, and give you element refs. Snapshots work while window is hidden.
 - **Be patient.** Deep Research takes 5-30 minutes. Update user every 2 minutes.
