@@ -5,7 +5,7 @@ You are installing the **Deep Research** skill for Claude Code. Follow these ste
 ## Step 1: Install web-plane
 
 ```bash
-npm install -g web-plane
+npm install -g github:andylizf/web-plane
 web-plane install
 ```
 
@@ -18,7 +18,7 @@ git clone https://github.com/andylizf/deep-research-skill.git ~/.claude/skills/d
 ## Step 3: Verify
 
 ```bash
-which web-plane && web-plane status && echo "Installation successful!" || echo "Something went wrong — check the output above for errors."
+web-plane doctor && echo "Installation successful!" || echo "Something went wrong — check the output above for errors."
 ```
 
 ## Step 4: Confirm to the user
@@ -27,4 +27,4 @@ Tell the user: "Deep Research skill installed! Use `/deep-research <your questio
 
 ## Requirements
 
-This skill requires **macOS**, **Google Chrome**, **Node.js >= 18**, and **Xcode Command Line Tools**. If any are missing, tell the user what to install before proceeding.
+This skill requires **macOS**, **Google Chrome**, **Node.js >= 22**, and **Xcode Command Line Tools**. If any are missing, tell the user what to install before proceeding.

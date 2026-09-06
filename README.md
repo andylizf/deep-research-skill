@@ -24,7 +24,7 @@ Or manually:
 
 ```bash
 # 1. Install web-plane (the browser layer)
-npm install -g web-plane
+npm install -g github:andylizf/web-plane
 web-plane install
 
 # 2. Install the skill
@@ -41,7 +41,7 @@ git clone https://github.com/andylizf/deep-research-skill.git ~/.claude/skills/d
 /deep-research --lang zh --sites arxiv.org,scholar.google.com transformer architectures for time series
 ```
 
-The skill opens a Chrome window you can't see, submits your query, waits 5-30 minutes, and brings back the Markdown report with sources. If you need to log in to ChatGPT, it'll pop the window up and wait for you.
+The skill opens a Chrome window you can't see, submits your query, waits 5-30 minutes, and brings back the Markdown report. The source links stay behind in ChatGPT -- the report's citations are opaque tokens, so click "N sources" in the conversation if you need the addresses. If you need to log in to ChatGPT, it'll pop the window up and hand the keyboard back to you.
 
 ## How it works
 
@@ -53,10 +53,10 @@ The skill itself is just SKILL.md: a set of instructions that tell Claude how to
 
 - macOS
 - Google Chrome
-- Node.js >= 18
+- Node.js >= 22
 - Xcode Command Line Tools (`xcode-select --install`)
 - ChatGPT Plus or Pro
-- [web-plane](https://github.com/andylizf/web-plane) (`npm install -g web-plane`)
+- [web-plane](https://github.com/andylizf/web-plane) (`npm install -g github:andylizf/web-plane`)
 
 ## Files
 
